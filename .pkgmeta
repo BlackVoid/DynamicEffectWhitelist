@@ -1,0 +1,7 @@
+ignore:
+    - .settings
+    - .svn
+    - bin
+    - .classpath
+    - .pkgmeta
+    - .plugin.yml

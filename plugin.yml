@@ -1,0 +1,42 @@
+name: DynamicEffectWhitelist
+main: com.dynamiceffect.whitelist.DynamicEffectWhitelist
+website: http://blackvoid.eu
+version: 1.5.0
+author: BlackVoid
+description: Whitelist plugin made for Dynamic Effects Minecraft Servers
+commands:
+  whitelist:
+    description: Commands for the whitelist plugin
+    usage: /<command> <add/remove/reload> [player]
+permissions:
+    dewhitelist.*:
+        description: Gives access to all whitelist commands
+        children:
+            dewhitelist.add: true
+            dewhitelist.remove: true
+            dewhitelist.displayfails: true
+            dewhitelist.reload: true
+            dewhitelist.refresh: true
+            dewhitelist.import: true
+            dewhitelist.mode: true
+    dewhitelist.add:
+        description: Allows user to add people to the whitelist.
+        default: op
+    dewhitelist.remove:
+        description: Allows user to remove people from the whitelist.
+        default: op
+    dewhitelist.displayfails:
+        description: Shows users with this permission any users that isn't on the whitelist and tries to connect, this feature needs to be activated in the config.
+        default: op
+    dewhitelist.reload:
+        description: Reloads the plugin.
+        default: op
+    dewhitelist.refresh:
+        description: Refreshes the whitelist.
+        default: op
+    dewhitelist.import:
+        description: Imports whitelist from one source to a another
+        default: op
+    dewhitelist.mode:
+        description: Allows you to turn on/off the whitelist
+        default: op

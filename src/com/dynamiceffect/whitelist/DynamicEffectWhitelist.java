@@ -1,0 +1,712 @@
+/////////////////////////////////
+//       ©2012 BlackVoid       //
+//     All rights reserved     //
+/////////////////////////////////
+//  This plugin is using the   //
+//           license           //
+//  Attribution-NonCommercial  //
+//   -ShareAlike 3.0 Unported  //
+//      (CC BY-NC-SA 3.0)      //
+/////////////////////////////////
+
+package com.dynamiceffect.whitelist;
+
+import java.net.URL;
+import java.net.URLConnection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Connection;
+import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.java.JavaPlugin;
+
+/**
+ * @author BlackVoid
+ */
+
+public class DynamicEffectWhitelist extends JavaPlugin {
+
+	public static final Logger log = Logger.getLogger("Minecraft");
+
+	static String maindir = "plugins/Dynamic Effect Whitelist/";
+	public static YamlConfiguration Settings;
+	static File SettingsFile = new File(maindir + "config.yml");
+	public Timer timer;
+	static ArrayList<String> WhiteListedPlayers = new ArrayList<String>();
+	MetricsLite metrics = null;
+	int RefreshWhitelistTaskID = -1;
+	static boolean WhitelistON = true;
+
+	public void onDisable() {
+		//Clears the whitelist array to clear up memory
+		WhiteListedPlayers = new ArrayList<String>();
+		//Removes the config to clear up memory
+		Settings = null;
+		
+		this.getServer().getScheduler().cancelAllTasks();
+	}
+
+	public void onEnable() {
+		new File(maindir).mkdir();
+		//Checks if file exists
+		if (!SettingsFile.exists()) {
+			//Creates the config file if it doesn't exist
+			try {
+				SettingsFile.createNewFile();
+				Settings = Config.loadMain(true);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}else{
+			//If it exists load the config
+			Settings = Config.loadMain(false);
+		}
+		// Sets the whitelists mode
+		WhitelistON = DynamicEffectWhitelist.Settings.getBoolean("General.WhitelistOn");
+		
+		PluginManager pm = getServer().getPluginManager();
+		
+		//Registers the Listener class
+		pm.registerEvents(new DynamicEffectPlayerListener(), this);
+		
+		log.log(Level.INFO, "[DEWhitelist] Whitelist is " + (WhitelistON == true ? "on" : "off"));
+		
+		RefreshWhitelist(true);
+		if(RefreshWhitelistTaskID < 0){
+			RefreshWhitelistTaskID = getServer().getScheduler().scheduleAsyncRepeatingTask(this, new TimerTask() {
+				public void run() {
+					RefreshWhitelist(false);
+				}
+			}, 0, Settings.getInt("General.UpdateInterval") * 1000);
+			
+			try {
+			    metrics = new MetricsLite(this);
+			    metrics.start();
+			} catch (IOException e) {
+			    log.log(Level.WARNING, "Error in MetricsLite: " + e.getMessage());
+			}
+		}
+	}
+
+	@Override
+	public boolean onCommand(CommandSender sender, Command command,
+		String commandLabel, String[] args) {
+		String commandName = command.getName().toLowerCase();
+		String[] trimmedArgs = args;
+
+		if (commandName.equals("whitelist")) {
+			return CommandHandler(sender, trimmedArgs);
+		}
+		return false;
+	}
+	
+	public static void SendMessage(CommandSender Player, String MSG){
+		Player.sendMessage("§7[DEW] §f" + MSG);
+	}
+
+	public boolean CommandHandler(CommandSender sender, String[] trimmedArgs) {
+		if (trimmedArgs.length > 0) {
+			String[] args = RearangeString(1, trimmedArgs);
+			String CommandName = trimmedArgs[0];
+			if (CommandName.equals("add")) {
+				return AddPlayerToWhitelist(sender, args);
+			}
+			if (CommandName.equals("remove")) {
+				return RemovePlayerFromWhitelist(sender, args);
+			}
+			if (CommandName.equals("reload")) {
+				return ReloadPlugin(sender, args);
+			}
+			if (CommandName.equals("refresh")) {
+				return RefreshWhitelist(sender, args);
+			}
+			if (CommandName.equals("import")) {
+				return ImportWhitelist(sender, args);
+			}
+			if (CommandName.equals("on")) {
+				return WhitelistOn(sender, args);
+			}
+			if (CommandName.equals("off")) {
+				return WhitelistOff(sender, args);
+			}
+			PrintHelper(sender);
+			return true;
+		} else {
+			PrintHelper(sender);
+			return true;
+		}
+	}
+	
+	private boolean WhitelistOn(CommandSender sender, String[] args){
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.mode"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			WhitelistON = true;
+			log.log(Level.INFO, "[DEWhitelist] "
+					+ (player == null ? "console" : player.getName())
+					+ " turned on the whitelist!");
+			sender.sendMessage("[DEWhitelist] Whitelist is now on!");
+			return true;
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+	
+	private boolean WhitelistOff(CommandSender sender, String[] args){
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.mode"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			WhitelistON = false;
+			log.log(Level.INFO, "[DEWhitelist] "
+					+ (player == null ? "console" : player.getName())
+					+ " turned on the whitelist!");
+			sender.sendMessage("[DEWhitelist] Whitelist is now off!");
+			return true;
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+	
+	private boolean RefreshWhitelist(CommandSender sender, String[] args){
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.refresh"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			log.log(Level.INFO, "[DEWhitelist] "
+					+ (player == null ? "console" : player.getName())
+					+ " refreshed the whitelist!");
+			sender.sendMessage("[DEWhitelist] Successfully refreshed the whitelist!");
+			(new UpdateWhitelist(false)).start();
+			return true;
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+	
+	private void PrintHelper(CommandSender sender){
+		sender.sendMessage("Commands:");
+		sender.sendMessage("    add [player] - Adds a player to the whitelist");
+		sender.sendMessage("    remove [player] - Removes a player from the whitelist");
+		sender.sendMessage("    reload - Reloads the plugin");
+		sender.sendMessage("    import [source] [destination] - imports whitelist from source to destination");
+		sender.sendMessage("    refresh - Refreshes the whitelist");
+	}
+	
+	private boolean ReloadPlugin(CommandSender sender, String[] args){
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.reload"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			onDisable();
+			onEnable();
+			log.log(Level.INFO, "[DEWhitelist] "
+					+ (player == null ? "console" : player.getName())
+					+ " reloaded the plugin!");
+			sender.sendMessage("[DEWhitelist] Successfully reloaded the plugin!");
+			return true;
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+	
+	private ArrayList<String> GetWhitelist(String Type){
+		ArrayList<String> tmpArray = new ArrayList<String>();
+		if(Type.equals("file")){
+			FileInputStream in;
+			try {
+				in = new FileInputStream(DynamicEffectWhitelist.Settings.getString("Other.file"));
+			
+				BufferedReader br = new BufferedReader(new InputStreamReader(in));
+				String strLine;
+				DebugPrint("Whitelist (type:" + Type +"):");
+				while ((strLine = br.readLine()) != null) {
+					DebugPrint(strLine.toLowerCase());
+					tmpArray.add(strLine.toLowerCase());
+				}
+				in.close();
+				return tmpArray;
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}else if(Type.equals("sql")){
+				Connection conn = SQLConnection.getSQLConnection();
+				if (conn == null) {
+					log.log(Level.SEVERE,
+							"[DEWhitelist] Could not establish SQL connection.");
+					return null;
+				} else {
+	
+					PreparedStatement ps = null;
+					ResultSet rs = null;
+					try {
+						String Query = DynamicEffectWhitelist.Settings.getString("sql.query");
+						Query = Query.replace("{table}",
+								DynamicEffectWhitelist.Settings.getString("sql.table"));
+						Query = Query.replace("{name}",
+								DynamicEffectWhitelist.Settings.getString("sql.UserField"));
+						Query = Query.replace("{time}", "" + GetTime());
+						ps = conn.prepareStatement(Query);
+						rs = ps.executeQuery();
+						DebugPrint("Whitelist (type:" + Type +"):");
+						while (rs.next()) {
+							tmpArray.add(rs.getString(
+									DynamicEffectWhitelist.Settings.getString("sql.UserField")).toLowerCase());
+							DebugPrint(rs
+									.getString(DynamicEffectWhitelist.Settings.getString("sql.UserField"))
+									.toLowerCase());
+						}
+						return tmpArray;
+					} catch (SQLException ex) {
+						log.log(Level.SEVERE,
+								"[DEWhitelist] Couldn't execute SQL statement: ",
+								ex);
+					} finally {
+						try {
+							if (ps != null)
+								ps.close();
+							if (conn != null)
+								conn.close();
+						} catch (SQLException ex) {
+							log.log(Level.SEVERE,
+									"[DEWhitelist] Failed to close db connection: ",
+									ex);
+						}
+					}
+	
+					try {
+						conn.close();
+					} catch (SQLException e) {
+						e.printStackTrace();
+					}
+				}
+		}else if(Type.equals("url")){
+				try {
+					URL url = new URL(DynamicEffectWhitelist.Settings.getString("Other.url"));
+					URLConnection con = url.openConnection();
+	
+					InputStream istream = con.getInputStream();
+					String Content = "";
+					int ch;
+					byte[] bytes = new byte[1];
+					while ((ch = istream.read()) != -1) {
+						bytes[0] = (byte) ch;
+						Content = Content + new String(bytes);
+					}
+					String[] tmpWL = Content.split("\\|");
+					if (tmpWL.length > 0) {
+						DebugPrint("Whitelist (type:" + Type +"):");
+						for (int i = 0; i < tmpWL.length; i++) {
+							tmpArray.add(tmpWL[i].toLowerCase());
+							DebugPrint(tmpWL[i].toLowerCase());
+						}
+						istream.close();
+						return tmpArray;
+					}
+					istream.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+		}else{
+			DynamicEffectWhitelist.log.log(Level.SEVERE,"[DEWhitelist] Connection Type: \"" + DynamicEffectWhitelist.Settings.getString("General.ConnectionType") + "\" does not exist!");
+		}
+		return null;
+	}
+	
+	private boolean ImportWhitelist(CommandSender sender, String[] args){
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.import"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			if(args.length == 2 || args.length == 3){
+				String source = args[0];
+				String target = args[1];
+				if(target.equals(source)){
+					sender.sendMessage("[DEWhitelist] Source and target can't be the same!");
+					return true;
+				}
+				ArrayList<String> TmpList = new ArrayList<String>();
+				if(source.equals("file") || source.equals("sql") || source.equals("url") || source.equals("world")){
+					if(source.equals("world")){
+						if(args.length == 2){
+							sender.sendMessage("[DEWhitelist] World name missing!");
+							sender.sendMessage("/whitelist import world " + target + " [world name]");
+							return true;							
+						}
+						File levelFile = new File(args[2]+"/level.dat");
+						if(levelFile.exists() && levelFile.isFile()){
+							File PlayerFolder = new File(args[2]+"/players");
+							File[] Players = PlayerFolder.listFiles();
+							if(Players == null){
+								sender.sendMessage("[DEWhitelist] No players exists in that world!");
+								return true;
+							}
+							for (File Player : Players) {
+								if(Player.isFile()){
+									TmpList.add(Player.getName().split("\\.")[0]);										
+								}
+							}
+						}else{
+							sender.sendMessage("[DEWhitelist] The world \"" + args[2] + "\" does not exist!");
+							return true;							
+						}
+					}else{
+						TmpList = GetWhitelist(source);
+						if(TmpList.equals(null)){
+							sender.sendMessage("[DEWhitelist] An error occured. Check console for errors!");
+							return true;
+						}
+					}
+				}else {
+					sender.sendMessage("[DEWhitelist] The source \"" + source + "\" does not exist!");
+					return true;
+				}
+				
+				if(!target.equals("file") && !target.equals("sql") && !target.equals("url")){
+					sender.sendMessage("[DEWhitelist] The target \"" + source + "\" does not exist!");
+					return true;
+				}
+				
+				ArrayList<String> TargetList = GetWhitelist(target);
+				if(TargetList.equals(null)){
+					sender.sendMessage("[DEWhitelist] An error occured when retriving the target whitelist!");
+					return true;
+				}
+				int OldSize = TargetList.size();
+				int Difference = 0;
+				if(target.equals("file")){
+					for(int i = 0; i<TmpList.size(); i++){
+						if(!TargetList.contains(TmpList.get(i))){
+							TargetList.add(TmpList.get(i));
+						}
+					}
+					try{
+						BufferedWriter fW = new BufferedWriter(new FileWriter(DynamicEffectWhitelist.Settings.getString("Other.file")));
+						for(int i = 0; i< TargetList.size(); i = i + 1){
+							fW.write(TargetList.get(i));
+							fW.newLine();
+						}
+					    fW.close();
+					}catch (Exception e){
+						e.printStackTrace();
+					}
+					Difference = TargetList.size() - OldSize;
+					sender.sendMessage("§6Successfully imported whitelist! " + Difference + " new " + (Difference==1?"entry":"entries") + "!");
+					return true;
+				}else if(target.equals("sql")){
+					Connection conn = null;
+					PreparedStatement ps = null;
+					conn = SQLConnection.getSQLConnection();
+					if (conn == null) {
+						log.log(Level.SEVERE,
+								"[DEWhitelist] Could not establish SQL connection.");
+						sender.sendMessage("[DEWhitelist] An unknown when connecting to the sql server!");
+						return true;
+					}
+					for(int i = 0; i<TmpList.size(); i++){
+						if(!TargetList.contains(TmpList.get(i))){
+							TargetList.add(TmpList.get(i));
+							try {
+								ps = conn.prepareStatement("INSERT INTO "
+										+ Settings.getString("sql.table") + " (name) VALUES(?)");
+								ps.setString(1, TmpList.get(i));
+								ps.executeUpdate();
+							} catch (SQLException ex) {
+								sender.sendMessage("[DEWhitelist] An error occured check console for errors!");
+								log.log(Level.SEVERE,
+										"[DEWhitelist] Couldn't execute SQL statement: ",
+										ex);
+								return true;
+							}
+						}
+					}
+					try {
+						ps.close();
+						conn.close();
+					} catch (SQLException e) {
+						e.printStackTrace();
+						sender.sendMessage("[DEWhitelist] An unknown error occured!");
+					}
+					Difference = TargetList.size() - OldSize;
+					if(DynamicEffectWhitelist.Settings.getString("General.ConnectionType") == target){
+						DynamicEffectWhitelist.WhiteListedPlayers = GetWhitelist(target);
+					}
+					sender.sendMessage("§6Successfully imported whitelist! " + Difference + " new entries.");
+					return true;
+				}else if(target.equals("url")){
+					sender.sendMessage("[DEWhitelist] You can't import a whitelist to a URL!");
+					return true;
+				}else{
+					sender.sendMessage("[DEWhitelist] The datatype: " + target + " doesn't exist!");
+					return true;
+				}
+			}else{
+				sender.sendMessage("/whitelist import [source] [target]");
+				return true;
+			}
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+
+	private boolean AddPlayerToWhitelist(CommandSender sender, String[] args) {
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.add"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			if (args.length > 0) {
+				String p = args[0];
+
+				if (DynamicEffectWhitelist.WhiteListedPlayers.contains(p
+						.toLowerCase())) {
+					sender.sendMessage("§cPlayer §e" + p
+							+ " §cis already whitelisted!");
+					return true;
+				}
+
+				DynamicEffectWhitelist.WhiteListedPlayers.add(p.toLowerCase());
+				String ConType = DynamicEffectWhitelist.Settings.getString("General.ConnectionType");
+				if(ConType.equals("file")){
+						try{
+							BufferedWriter fW = new BufferedWriter(new FileWriter(DynamicEffectWhitelist.Settings.getString("Other.file")));
+							for(int i = 0; i< DynamicEffectWhitelist.WhiteListedPlayers.size(); i = i + 1){
+								fW.write(DynamicEffectWhitelist.WhiteListedPlayers.get(i));
+								fW.newLine();
+							}
+						    fW.close();
+						}catch (Exception e){
+							e.printStackTrace();
+						}
+						sender.sendMessage("§6Successfully whitelisted " + p + "!");
+						return true;
+				}else if(ConType.equals("sql")){
+						Connection conn = null;
+						PreparedStatement ps = null;
+						try {
+							conn = SQLConnection.getSQLConnection();
+							ps = conn.prepareStatement("INSERT INTO "
+									+ Settings.getString("sql.table") + " (name) VALUES(?)");
+							ps.setString(1, p);
+							ps.executeUpdate();
+						} catch (SQLException ex) {
+							log.log(Level.SEVERE,
+									"[DEWhitelist] Couldn't execute SQL statement: ",
+									ex);
+						} finally {
+							try {
+								if (ps != null)
+									ps.close();
+								if (conn != null)
+									conn.close();
+							} catch (SQLException ex) {
+								log.log(Level.SEVERE,
+										"[DEWhitelist] Failed to close db connection: ",
+										ex);
+							}
+						}
+
+						log.log(Level.INFO, "[DEWhitelist] "
+								+ (player == null ? "console" : player.getName())
+								+ " whitelisted player " + p + ".");
+						sender.sendMessage("§6Successfully whitelisted " + p + "!");
+						return true;
+				}else if(ConType.equals("url")){
+						sender.sendMessage("§6You cant add people to the whitelist with this connection type!");
+						return true;
+				}else{
+					DynamicEffectWhitelist.log.log(Level.SEVERE,"[DEWhitelist] Connection Type: \"" + DynamicEffectWhitelist.Settings.getString("General.ConnectionType") + "\" does not exist!");
+				}
+			}
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+
+	private boolean RemovePlayerFromWhitelist(CommandSender sender, String[] args) {
+		boolean auth = false;
+		Player player = null;
+		if (sender instanceof Player) {
+			player = (Player) sender;
+			if (player.hasPermission("dewhitelist.displayfails"))
+				auth = true;
+		} else {
+			auth = true;
+		}
+		if (auth) {
+			if (args.length > 0) {
+				String p = args[0];
+				Player victim = this.getServer().getPlayer(p);
+
+				if (!DynamicEffectWhitelist.WhiteListedPlayers.contains(p
+						.toLowerCase())) {
+					sender.sendMessage("§cPlayer §e" + p
+							+ " §cis not whitelisted!");
+					return true;
+				}
+
+				if (victim != null) {
+					p = victim.getName();
+				}
+
+				DynamicEffectWhitelist.WhiteListedPlayers.remove(p
+						.toLowerCase());
+				String ConType = DynamicEffectWhitelist.Settings.getString("General.ConnectionType");
+				if(ConType.equals("file")){
+					try{
+						BufferedWriter fW = new BufferedWriter(new FileWriter(DynamicEffectWhitelist.Settings.getString("Other.file")));
+						for(int i = 0; i< DynamicEffectWhitelist.WhiteListedPlayers.size(); i = i + 1){
+							fW.write(DynamicEffectWhitelist.WhiteListedPlayers.get(i));
+							fW.newLine();
+						}
+					    fW.close();
+					}catch (Exception e){
+						e.printStackTrace();
+					}
+				}else if(ConType.equals("sql")){
+					Connection conn = null;
+					PreparedStatement ps = null;
+					try {
+						conn = SQLConnection.getSQLConnection();
+						ps = conn.prepareStatement("DELETE FROM "
+								+ Settings.getString("sql.table") + " WHERE name = ?");
+						ps.setString(1, p);
+						ps.executeUpdate();
+					} catch (SQLException ex) {
+						log.log(Level.SEVERE,
+								"[DEWhitelist] Couldn't execute SQL statement: ",
+								ex);
+					} finally {
+						try {
+							if (ps != null)
+								ps.close();
+							if (conn != null)
+								conn.close();
+						} catch (SQLException ex) {
+							log.log(Level.SEVERE,
+									"[DEWhitelist] Failed to close SQL connection: ",
+									ex);
+						}
+					}
+				}else if(ConType.equals("url")){
+					sender.sendMessage("§6You cant add people to the whitelist with this connection type!");
+					return true;
+				}else{
+					DynamicEffectWhitelist.log.log(Level.SEVERE,"[DEWhitelist] Connection Type: \"" + DynamicEffectWhitelist.Settings.getString("General.ConnectionType") + "\" does not exist!");
+					return true;
+				}
+				sender.sendMessage("§6Successfully removed " + p
+						+ "from the whitelist!");
+				return true;
+			}
+		}
+		sender.sendMessage("§6You have no access to this command!");
+		return true;
+	}
+
+	public static void DebugPrint(String MSG) {
+		if (Settings.getBoolean("Other.debug")) {
+			log.log(Level.INFO, MSG);
+		}
+	}
+
+	public static String[] RearangeString(int startIndex, String[] string) {
+		String TMPString = "";
+		for (int i = startIndex; i < string.length; i++) {
+			String Add = " ";
+			if (i == startIndex) {
+				Add = "";
+			}
+			TMPString += Add + string[i];
+		}
+		return TMPString.split("\\ ");
+	}
+
+	public void RefreshWhitelist(Boolean First) {
+		new UpdateWhitelist(First).run();
+	}
+
+	public long GetTime() {
+		return System.currentTimeMillis() / 1000L;
+	}
+
+	class UpdateWhitelist extends Thread {
+
+		private Boolean First;
+
+		public UpdateWhitelist(Boolean First) {
+			this.First = First;
+		}
+
+		public void run() {
+			String ConType = DynamicEffectWhitelist.Settings.getString("General.ConnectionType");
+			if(ConType.equals("file") || ConType.equals("sql") || ConType.equals("url")){
+				ArrayList<String> TmpArray = new ArrayList<String>();
+				TmpArray = GetWhitelist(ConType);
+				if(!TmpArray.equals(null)){
+					if(First){
+						log.log(Level.INFO, "[DEWhitelist] Whitelist retrived successfully!");
+					}
+					DynamicEffectWhitelist.WhiteListedPlayers = TmpArray;
+				}
+				TmpArray = null;
+				return;
+			}
+			log.log(Level.SEVERE, "[DEWhitelist] The source \"" + ConType + "\" does not exist!");
+		}
+	}
+}
