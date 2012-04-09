@@ -18,8 +18,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Connection;
 import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -49,7 +47,6 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	static String maindir = "plugins/Dynamic Effect Whitelist/";
 	public static YamlConfiguration Settings;
 	static File SettingsFile = new File(maindir + "config.yml");
-	public Timer timer;
 	static ArrayList<String> WhiteListedPlayers = new ArrayList<String>();
 	MetricsLite metrics = null;
 	int RefreshWhitelistTaskID = -1;
@@ -62,6 +59,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 		Settings = null;
 		
 		this.getServer().getScheduler().cancelAllTasks();
+		RefreshWhitelistTaskID = -1;
 	}
 
 	public void onEnable() {
@@ -91,18 +89,17 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 		
 		RefreshWhitelist(true);
 		if(RefreshWhitelistTaskID < 0){
-			RefreshWhitelistTaskID = getServer().getScheduler().scheduleAsyncRepeatingTask(this, new TimerTask() {
+			RefreshWhitelistTaskID = getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() {
 				public void run() {
 					RefreshWhitelist(false);
 				}
-			}, 0, Settings.getInt("General.UpdateInterval") * 1000);
-			
-			try {
-			    metrics = new MetricsLite(this);
-			    metrics.start();
-			} catch (IOException e) {
-			    log.log(Level.WARNING, "Error in MetricsLite: " + e.getMessage());
-			}
+			}, 0, Settings.getInt("General.UpdateInterval") * 20);
+		}
+		try {
+		    metrics = new MetricsLite(this);
+		    metrics.start();
+		} catch (IOException e) {
+		    log.log(Level.WARNING, "Error in MetricsLite: " + e.getMessage());
 		}
 	}
 
