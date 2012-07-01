@@ -36,6 +36,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.dynamiceffect.whitelist.Metrics.Graph;
+
 /**
  * @author BlackVoid
  */
@@ -48,7 +50,6 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	public static YamlConfiguration Settings;
 	static File SettingsFile = new File(maindir + "config.yml");
 	static ArrayList<String> WhiteListedPlayers = new ArrayList<String>();
-	MetricsLite metrics = null;
 	int RefreshWhitelistTaskID = -1;
 	static boolean WhitelistON = true;
 
@@ -86,7 +87,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 		pm.registerEvents(new DynamicEffectPlayerListener(), this);
 		
 		log.log(Level.INFO, "[DEWhitelist] Whitelist is " + (WhitelistON == true ? "on" : "off"));
-		
+		DebugPrint("Debug mode is on! Turn it off in the config if you do not want to see debug messages.");
 		RefreshWhitelist(true);
 		if(RefreshWhitelistTaskID < 0){
 			RefreshWhitelistTaskID = getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() {
@@ -96,10 +97,37 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			}, 0, Settings.getInt("General.UpdateInterval") * 20);
 		}
 		try {
-		    metrics = new MetricsLite(this);
+		    Metrics metrics = new Metrics(this);
+
+		    Graph graph = metrics.createGraph("Data source usage");
+		    graph.addPlotter(new Metrics.Plotter("MySQL") {
+
+		            @Override
+		            public int getValue() {
+		                    return DynamicEffectWhitelist.Settings.getString("General.ConnectionType").equals("sql")? 1 : 0;
+		            }
+
+		    });
+		    graph.addPlotter(new Metrics.Plotter("File") {
+
+		            @Override
+		            public int getValue() {
+		                    return DynamicEffectWhitelist.Settings.getString("General.ConnectionType").equals("file")? 1 : 0;
+		            }
+
+		    });
+		    graph.addPlotter(new Metrics.Plotter("URL") {
+
+		            @Override
+		            public int getValue() {
+		                    return DynamicEffectWhitelist.Settings.getString("General.ConnectionType").equals("url")? 1 : 0;
+		            }
+
+		    });
+		    
 		    metrics.start();
 		} catch (IOException e) {
-		    log.log(Level.WARNING, "Error in MetricsLite: " + e.getMessage());
+			log.log(Level.WARNING, "Error in Metrics: " + e.getMessage());
 		}
 	}
 
@@ -144,12 +172,9 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			if (CommandName.equals("off")) {
 				return WhitelistOff(sender, args);
 			}
-			PrintHelper(sender);
-			return true;
-		} else {
-			PrintHelper(sender);
-			return true;
 		}
+		PrintHelper(sender);
+		return true;
 	}
 	
 	private boolean WhitelistOn(CommandSender sender, String[] args){
@@ -259,11 +284,10 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			
 				BufferedReader br = new BufferedReader(new InputStreamReader(in));
 				String strLine;
-				DebugPrint("Whitelist (type:" + Type +"):");
 				while ((strLine = br.readLine()) != null) {
-					DebugPrint(strLine.toLowerCase());
 					tmpArray.add(strLine.toLowerCase());
 				}
+				DebugPrint("Whitelist (type:" + Type +" count: " + tmpArray.toArray().length + ")");
 				in.close();
 				return tmpArray;
 			} catch (IOException e1) {
@@ -288,14 +312,11 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 						Query = Query.replace("{time}", "" + GetTime());
 						ps = conn.prepareStatement(Query);
 						rs = ps.executeQuery();
-						DebugPrint("Whitelist (type:" + Type +"):");
 						while (rs.next()) {
 							tmpArray.add(rs.getString(
 									DynamicEffectWhitelist.Settings.getString("sql.UserField")).toLowerCase());
-							DebugPrint(rs
-									.getString(DynamicEffectWhitelist.Settings.getString("sql.UserField"))
-									.toLowerCase());
 						}
+						DebugPrint("Whitelist (type:" + Type +" count: " + tmpArray.toArray().length + ")");
 						return tmpArray;
 					} catch (SQLException ex) {
 						log.log(Level.SEVERE,
@@ -335,11 +356,10 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 					}
 					String[] tmpWL = Content.split("\\|");
 					if (tmpWL.length > 0) {
-						DebugPrint("Whitelist (type:" + Type +"):");
 						for (int i = 0; i < tmpWL.length; i++) {
 							tmpArray.add(tmpWL[i].toLowerCase());
-							DebugPrint(tmpWL[i].toLowerCase());
 						}
+						DebugPrint("Whitelist (type:" + Type +" count: " + tmpArray.toArray().length + ")");
 						istream.close();
 						return tmpArray;
 					}
@@ -579,7 +599,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 		Player player = null;
 		if (sender instanceof Player) {
 			player = (Player) sender;
-			if (player.hasPermission("dewhitelist.displayfails"))
+			if (player.hasPermission("dewhitelist.remove"))
 				auth = true;
 		} else {
 			auth = true;
@@ -657,7 +677,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 
 	public static void DebugPrint(String MSG) {
 		if (Settings.getBoolean("Other.debug")) {
-			log.log(Level.INFO, MSG);
+			log.log(Level.INFO, "[DEWhitelist-debug] " + MSG);
 		}
 	}
 

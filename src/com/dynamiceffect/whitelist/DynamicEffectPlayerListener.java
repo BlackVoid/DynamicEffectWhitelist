@@ -18,6 +18,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
+import org.bukkit.event.player.PlayerLoginEvent.Result;
 import org.bukkit.entity.Player;
 
 /**
@@ -29,18 +30,22 @@ public class DynamicEffectPlayerListener implements Listener {
     	if( DynamicEffectWhitelist.WhitelistON == true){
 	    	Player player = event.getPlayer();
 	    	//Checks if player is on the whitelist
-	    	if(!DynamicEffectWhitelist.WhiteListedPlayers.contains(player.getName().toLowerCase())){
-	    		//Kick message
-	    		String DisMSG = DynamicEffectWhitelist.Settings.getString("General.DisconnectMessage")
-	    				.replace("{player}", player.getName());
-	    		event.setKickMessage(DisMSG);
-	    		event.setResult(PlayerLoginEvent.Result.KICK_OTHER);
-	    		
-	    		DynamicEffectWhitelist.log.log(Level.INFO,"[DEWhitelist] " + player.getName() + " is not whitelisted! Deny!");
-	    		//Check if print connection failures is enabled
-	    		if(DynamicEffectWhitelist.Settings.getBoolean("General.PrintConnectFails") == true){
-					Bukkit.getServer().broadcast("§7[DEW] §f" + DynamicEffectWhitelist.Settings.getString("General.DisallowMessage").replace("{player}", player.getName()), "dewhitelist.displayfails");
-	    		}
+	    	if(event.getResult() == Result.ALLOWED){
+		    	if(!DynamicEffectWhitelist.WhiteListedPlayers.contains(player.getName().toLowerCase())){
+		    		//Kick message
+		    		String DisMSG = DynamicEffectWhitelist.Settings.getString("General.DisconnectMessage")
+		    				.replace("{player}", player.getName());
+		    		event.setKickMessage(DisMSG);
+		    		event.setResult(PlayerLoginEvent.Result.KICK_WHITELIST);
+		    		
+		    		DynamicEffectWhitelist.log.log(Level.INFO,"[DEWhitelist] " + player.getName() + " is not whitelisted! Deny!");
+		    		//Check if print connection failures is enabled
+		    		if(DynamicEffectWhitelist.Settings.getBoolean("General.PrintConnectFails") == true){
+						Bukkit.getServer().broadcast("§7[DEW] §f" + DynamicEffectWhitelist.Settings.getString("General.DisallowMessage").replace("{player}", player.getName()), "dewhitelist.displayfails");
+		    		}
+		    	}
+	    	}else{
+	    		DynamicEffectWhitelist.DebugPrint("Other plugin has already disallowed player");
 	    	}
     	}
     }
