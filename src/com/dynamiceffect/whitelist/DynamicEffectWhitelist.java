@@ -500,7 +500,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 					sender.sendMessage("§6Successfully imported whitelist! " + Difference + " new entries.");
 					return true;
 				}else if(target.equals("url")){
-					sender.sendMessage("[DEWhitelist] You can't import a whitelist to a URL!");
+					sender.sendMessage("[DEWhitelist] You can't import the whitelist to a URL!");
 					return true;
 				}else{
 					sender.sendMessage("[DEWhitelist] The datatype: " + target + " doesn't exist!");
