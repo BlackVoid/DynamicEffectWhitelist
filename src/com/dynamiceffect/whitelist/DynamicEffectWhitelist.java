@@ -304,12 +304,10 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 					PreparedStatement ps = null;
 					ResultSet rs = null;
 					try {
-						String Query = DynamicEffectWhitelist.Settings.getString("sql.query");
-						Query = Query.replace("{table}",
-								DynamicEffectWhitelist.Settings.getString("sql.table"));
-						Query = Query.replace("{name}",
-								DynamicEffectWhitelist.Settings.getString("sql.UserField"));
-						Query = Query.replace("{time}", "" + GetTime());
+						String Query = DynamicEffectWhitelist.Settings.getString("sql.queries.Select").replace("{table}",
+								DynamicEffectWhitelist.Settings.getString("sql.table")).replace("{name}",
+								DynamicEffectWhitelist.Settings.getString("sql.UserField")).replace("{time}",
+								"" + GetTime());
 						ps = conn.prepareStatement(Query);
 						rs = ps.executeQuery();
 						while (rs.next()) {
@@ -556,8 +554,10 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 						PreparedStatement ps = null;
 						try {
 							conn = SQLConnection.getSQLConnection();
-							ps = conn.prepareStatement("INSERT INTO "
-									+ Settings.getString("sql.table") + " (name) VALUES(?)");
+							ps = conn.prepareStatement(DynamicEffectWhitelist.Settings.getString("sql.queries.Insert").replace("{table}",
+														DynamicEffectWhitelist.Settings.getString("sql.table")).replace("{name}",
+														DynamicEffectWhitelist.Settings.getString("sql.UserField")).replace("{time}",
+														"" + GetTime()));
 							ps.setString(1, p);
 							ps.executeUpdate();
 						} catch (SQLException ex) {
@@ -639,8 +639,10 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 					PreparedStatement ps = null;
 					try {
 						conn = SQLConnection.getSQLConnection();
-						ps = conn.prepareStatement("DELETE FROM "
-								+ Settings.getString("sql.table") + " WHERE name = ?");
+						ps = conn.prepareStatement(DynamicEffectWhitelist.Settings.getString("sql.queries.Delete").replace("{table}",
+								DynamicEffectWhitelist.Settings.getString("sql.table")).replace("{name}",
+								DynamicEffectWhitelist.Settings.getString("sql.UserField")).replace("{time}",
+								"" + GetTime()));
 						ps.setString(1, p);
 						ps.executeUpdate();
 					} catch (SQLException ex) {

@@ -45,8 +45,10 @@ public class Config {
 			SetDefault("sql.password", "password");
 			SetDefault("sql.table", "table");
 			SetDefault("sql.database", "minecraft");
-			SetDefault("sql.query", "SELECT {name} FROM `{table}`;");
 			SetDefault("sql.UserField", "name");
+			SetDefault("sql.queries.Select", "SELECT `{name}` FROM `{table}`;");
+			SetDefault("sql.queries.Insert", "INSERT INTO `{table}` (`{name}`) VALUES(?);");
+			SetDefault("sql.queries.Delete", "DELETE FROM `{table}` WHERE `{name}` = ?");
 			SetDefault("Other.url", "http://mywebsite.com/whitelist.php");
 			SetDefault("Other.file", "white-list.txt");
 			SetDefault("Other.debug", false);
