@@ -86,16 +86,22 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 		//Registers the Listener class
 		pm.registerEvents(new DynamicEffectPlayerListener(), this);
 		
+		//Prints if its on or off.
 		log.log(Level.INFO, "[DEWhitelist] Whitelist is " + (WhitelistON == true ? "on" : "off"));
+		//If debug mode is on this message will print to notify the user
 		DebugPrint("Debug mode is on! Turn it off in the config if you do not want to see debug messages.");
 		RefreshWhitelist(true);
+		//If the refresh timer doesnt exist it creates one.
 		if(RefreshWhitelistTaskID < 0){
 			RefreshWhitelistTaskID = getServer().getScheduler().scheduleAsyncRepeatingTask(this, new Runnable() {
 				public void run() {
+					//Refreshes the whitelist
 					RefreshWhitelist(false);
 				}
 			}, 0, Settings.getInt("General.UpdateInterval") * 20);
 		}
+		
+		//Loads Metrics
 		try {
 		    Metrics metrics = new Metrics(this);
 
@@ -125,6 +131,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 
 		    });
 		    
+		    //Starts Metrics
 		    metrics.start();
 		} catch (IOException e) {
 			log.log(Level.WARNING, "Error in Metrics: " + e.getMessage());
@@ -138,6 +145,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 		String[] trimmedArgs = args;
 
 		if (commandName.equals("whitelist")) {
+			//Sends all /whitelsit chat messages to CommandHandler
 			return CommandHandler(sender, trimmedArgs);
 		}
 		return false;
@@ -149,6 +157,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 
 	public boolean CommandHandler(CommandSender sender, String[] trimmedArgs) {
 		if (trimmedArgs.length > 0) {
+			//Creates a new array without the first value i.e trimmedString[0]
 			String[] args = RearangeString(1, trimmedArgs);
 			String CommandName = trimmedArgs[0];
 			if (CommandName.equals("add")) {
@@ -173,6 +182,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 				return WhitelistOff(sender, args);
 			}
 		}
+		//If no function has handles the command then print the helper.
 		PrintHelper(sender);
 		return true;
 	}
@@ -180,6 +190,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean WhitelistOn(CommandSender sender, String[] args){
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.mode"))
@@ -188,6 +199,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			auth = true;
 		}
 		if (auth) {
+			//Turns the whitelist on, doesnt change the config value though.
 			WhitelistON = true;
 			log.log(Level.INFO, "[DEWhitelist] "
 					+ (player == null ? "console" : player.getName())
@@ -202,6 +214,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean WhitelistOff(CommandSender sender, String[] args){
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.mode"))
@@ -210,6 +223,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			auth = true;
 		}
 		if (auth) {
+			//Turns the whitelist off, doesnt change the config value though.
 			WhitelistON = false;
 			log.log(Level.INFO, "[DEWhitelist] "
 					+ (player == null ? "console" : player.getName())
@@ -224,6 +238,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean RefreshWhitelist(CommandSender sender, String[] args){
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.refresh"))
@@ -236,6 +251,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 					+ (player == null ? "console" : player.getName())
 					+ " refreshed the whitelist!");
 			sender.sendMessage("[DEWhitelist] Successfully refreshed the whitelist!");
+			//Runs refresh whitelist function
 			(new UpdateWhitelist(false)).start();
 			return true;
 		}
@@ -255,6 +271,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean ReloadPlugin(CommandSender sender, String[] args){
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.reload"))
@@ -263,7 +280,9 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			auth = true;
 		}
 		if (auth) {
+			//Disables the plugin
 			onDisable();
+			//Enables the plugin
 			onEnable();
 			log.log(Level.INFO, "[DEWhitelist] "
 					+ (player == null ? "console" : player.getName())
@@ -276,7 +295,9 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	}
 	
 	private ArrayList<String> GetWhitelist(String Type){
+		//Makes an empty temporary array
 		ArrayList<String> tmpArray = new ArrayList<String>();
+		//Checks which connection type you are using
 		if(Type.equals("file")){
 			FileInputStream in;
 			try {
@@ -284,11 +305,14 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			
 				BufferedReader br = new BufferedReader(new InputStreamReader(in));
 				String strLine;
+				//Adds each line(player) to the temporary array
 				while ((strLine = br.readLine()) != null) {
 					tmpArray.add(strLine.toLowerCase());
 				}
+				//If debug mode is on it will print connection type and people in the whitelist
 				DebugPrint("Whitelist (type:" + Type +" count: " + tmpArray.toArray().length + ")");
 				in.close();
+				//Returns all players in the whitelist
 				return tmpArray;
 			} catch (IOException e1) {
 				e1.printStackTrace();
@@ -304,17 +328,22 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 					PreparedStatement ps = null;
 					ResultSet rs = null;
 					try {
+						//Loads the query and replaces all variables with their values.
 						String Query = DynamicEffectWhitelist.Settings.getString("sql.queries.Select").replace("{table}",
 								DynamicEffectWhitelist.Settings.getString("sql.table")).replace("{name}",
 								DynamicEffectWhitelist.Settings.getString("sql.UserField")).replace("{time}",
 								"" + GetTime());
 						ps = conn.prepareStatement(Query);
 						rs = ps.executeQuery();
+						//Adds each player retrived to the array
 						while (rs.next()) {
 							tmpArray.add(rs.getString(
 									DynamicEffectWhitelist.Settings.getString("sql.UserField")).toLowerCase());
 						}
+						//If debug mode is on it will print connection type and people in the whitelist
 						DebugPrint("Whitelist (type:" + Type +" count: " + tmpArray.toArray().length + ")");
+						
+						//Returns all players in the whitelist
 						return tmpArray;
 					} catch (SQLException ex) {
 						log.log(Level.SEVERE,
@@ -352,13 +381,18 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 						bytes[0] = (byte) ch;
 						Content = Content + new String(bytes);
 					}
+					//Makes a new array entry for each | character
 					String[] tmpWL = Content.split("\\|");
 					if (tmpWL.length > 0) {
+						//Adds each player to the array retrived from the URL
 						for (int i = 0; i < tmpWL.length; i++) {
 							tmpArray.add(tmpWL[i].toLowerCase());
 						}
+						//If debug mode is on it will print connection type and people in the whitelist
 						DebugPrint("Whitelist (type:" + Type +" count: " + tmpArray.toArray().length + ")");
 						istream.close();
+						
+						//Returns all players in the whitelist
 						return tmpArray;
 					}
 					istream.close();
@@ -374,6 +408,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean ImportWhitelist(CommandSender sender, String[] args){
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.import"))
@@ -382,14 +417,17 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 			auth = true;
 		}
 		if (auth) {
+			//Checks if number of arguments is 3 or 2
 			if(args.length == 2 || args.length == 3){
 				String source = args[0];
 				String target = args[1];
+				//Checks if source and destination is the same
 				if(target.equals(source)){
 					sender.sendMessage("[DEWhitelist] Source and target can't be the same!");
 					return true;
 				}
 				ArrayList<String> TmpList = new ArrayList<String>();
+				//Checks if source is one of the valid sources
 				if(source.equals("file") || source.equals("sql") || source.equals("url") || source.equals("world")){
 					if(source.equals("world")){
 						if(args.length == 2){
@@ -516,6 +554,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean AddPlayerToWhitelist(CommandSender sender, String[] args) {
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.add"))
@@ -597,6 +636,7 @@ public class DynamicEffectWhitelist extends JavaPlugin {
 	private boolean RemovePlayerFromWhitelist(CommandSender sender, String[] args) {
 		boolean auth = false;
 		Player player = null;
+		//Checks for permission
 		if (sender instanceof Player) {
 			player = (Player) sender;
 			if (player.hasPermission("dewhitelist.remove"))

@@ -21,7 +21,15 @@ public class Config {
 	public static YamlConfiguration Config;
 
 	public static void SetDefault(String Path, Object Value){
+		//Gets the value of the path and if it doesnt exist it sets it to the deafult value.
 		Config.set(Path, Config.get(Path, Value));
+	}
+	
+	public static void ChangePath(String OldPath, String NewPath){
+		//Gets the old paths value and sets that value for the new path.
+		Config.set(NewPath, Config.get(OldPath, Config.get(NewPath, null)));
+		//Removes the old path
+		Config.set(OldPath, null);
 	}
 	
 	public static YamlConfiguration loadMain(boolean Create){
@@ -32,6 +40,11 @@ public class Config {
 			if(Create == false){
 				Config.load(Settings);
 			}
+			
+			//Changes the old paths to the new paths.
+			ChangePath("sql.query","sql.queries.Select");
+			
+			//Sets all default values, if yml path doesnt exist it sets it to default else it gets the value.
 			SetDefault("General.WhitelistOn", true);
 			SetDefault("General.ConnectionType", "file");
 			SetDefault("General.UpdateInterval", 60);
@@ -52,6 +65,7 @@ public class Config {
 			SetDefault("Other.url", "http://mywebsite.com/whitelist.php");
 			SetDefault("Other.file", "white-list.txt");
 			SetDefault("Other.debug", false);
+			
 			Config.save(Settings);
 			return Config;
 		} catch (FileNotFoundException e) {
@@ -59,6 +73,8 @@ public class Config {
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (InvalidConfigurationException e) {
+			e.printStackTrace();
+		} catch (Exception e){
 			e.printStackTrace();
 		}
 		return null;
